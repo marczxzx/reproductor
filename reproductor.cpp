@@ -77,6 +77,7 @@ public:
 private:
     unique_ptr<TrieNode> root;
 };
+
 // Clase para gestionar la biblioteca de canciones
 class SongLibrary {
 public:
@@ -199,7 +200,6 @@ void showMenu(SongLibrary& library) {
         }
     } while (choice != 4);
 }
-
 
 int main() {
     SongLibrary library;
