@@ -1,216 +1,3 @@
-/* #include <iostream>
-#include <fstream>
-#include <unordered_map>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <memory>
-#include <algorithm>
-
-using namespace std;
-
-// Estructura para almacenar información de una canción
-struct Song {
-    int index;
-    string artist_name;
-    string track_name;
-    int popularity;
-    int year;
-    string genre;
-};
-
-// Función para convertir un string a minúsculas
-string toLowerCase(const string& str) {
-    string result = str;
-    for (char& c : result) {
-        c = tolower(c);
-    }
-    return result;
-}
-
-// Función segura para convertir un string a int
-int safe_stoi(const string& str) {
-    try {
-        return stoi(str);
-    } catch (const invalid_argument&) {
-        return 0; // Valor predeterminado si la conversión falla
-    }
-}
-
-// Nodo del Trie
-struct TrieNode {
-    unordered_map<char, unique_ptr<TrieNode>> children;
-    vector<Song*> songs; // Lista de punteros a canciones que coinciden con este prefijo
-};
-
-// Estructura Trie para realizar búsquedas por prefijo en `artist_name` y `track_name`
-class Trie {
-public:
-    Trie() : root(make_unique<TrieNode>()) {}
-
-    // Insertar una canción en el Trie usando el nombre del artista o de la canción
-    void insert(const string& key, Song* song) {
-        string lowerKey = toLowerCase(key);
-        TrieNode* current = root.get();
-        for (char ch : lowerKey) {
-            if (!current->children[ch]) {
-                current->children[ch] = make_unique<TrieNode>();
-            }
-            current = current->children[ch].get();
-        }
-        current->songs.push_back(song);
-    }
-
-    // Búsqueda de canciones por prefijo
-    vector<Song*> searchByPrefix(const string& prefix) const {
-        string lowerPrefix = toLowerCase(prefix);
-        TrieNode* current = root.get();
-        for (char ch : lowerPrefix) {
-            if (!current->children.count(ch)) {
-                return {}; // No hay coincidencias
-            }
-            current = current->children[ch].get();
-        }
-        return current->songs; // Retorna todas las canciones que coincidan con el prefijo
-    }
-
-private:
-    unique_ptr<TrieNode> root;
-};
-
-// Clase para gestionar la biblioteca de canciones
-class SongLibrary {
-public:
-    // Cargar canciones desde el archivo CSV
-    void loadSongs(const string& filename) {
-        ifstream file(filename);
-        string line;
-
-        if (!file.is_open()) {
-            cerr << "Error al abrir el archivo." << endl;
-            return;
-        }
-
-        // Ignorar la primera línea (encabezados)
-        getline(file, line);
-
-        while (getline(file, line)) {
-            stringstream ss(line);
-            string index_str, artist_name, track_name, track_id, popularity_str, year_str, genre;
-
-            // Leer cada campo de acuerdo al orden en el archivo
-            getline(ss, index_str, ',');
-            getline(ss, artist_name, ',');
-            getline(ss, track_name, ',');
-            getline(ss, track_id, ',');
-            getline(ss, popularity_str, ',');
-            getline(ss, year_str, ',');
-            getline(ss, genre, ',');
-
-            // Convertir campos numéricos
-            int index = safe_stoi(index_str);
-            int popularity = safe_stoi(popularity_str);
-            int year = safe_stoi(year_str);
-
-            // Crear y almacenar la canción
-            Song song = {index, artist_name, track_name, popularity, year, genre};
-            songs.emplace(track_id, song);
-
-            // Insertar en los tries usando nombres en minúsculas
-            artistTrie.insert(toLowerCase(artist_name), &songs[track_id]);
-            trackTrie.insert(toLowerCase(track_name), &songs[track_id]);
-        }
-
-        file.close();
-    }
-
-    // Búsqueda por track_id usando el unordered_map
-    Song* searchByTrackId(const string& track_id) {
-        if (songs.count(track_id)) {
-            return &songs[track_id];
-        }
-        return nullptr;
-    }
-
-    // Búsqueda por nombre del artista usando Trie
-    vector<Song*> searchByArtistName(const string& artist_name) const {
-        return artistTrie.searchByPrefix(artist_name);
-    }
-
-    // Búsqueda por nombre de la canción usando Trie
-    vector<Song*> searchByTrackName(const string& track_name) const {
-        return trackTrie.searchByPrefix(track_name);
-    }
-
-private:
-    unordered_map<string, Song> songs;
-    Trie artistTrie;
-    Trie trackTrie;
-};
-
-// Función para mostrar el menú y realizar las búsquedas
-void showMenu(SongLibrary& library) {
-    int choice;
-    string input;
-
-    do {
-        cout << "\n--- Menu de Busqueda ---\n";
-        cout << "1. Buscar por Track ID\n";
-        cout << "2. Buscar por Nombre del Artista\n";
-        cout << "3. Buscar por Nombre de la Cancion\n";
-        cout << "4. Salir\n";
-        cout << "Elige una opcion: ";
-        cin >> choice;
-        cin.ignore(); // Limpiar el buffer de entrada
-
-        switch (choice) {
-            case 1:
-                cout << "Ingresa el Track ID: ";
-                getline(cin, input);
-                if (Song* song = library.searchByTrackId(input)) {
-                    cout << "Cancion encontrada: " << song->track_name << " - " << song->artist_name << " (" << song->year << ")" << endl;
-                } else {
-                    cout << "Track ID no encontrado." << endl;
-                }
-                break;
-
-            case 2:
-                cout << "Ingresa el Nombre del Artista: ";
-                getline(cin, input);
-                for (const auto& song : library.searchByArtistName(toLowerCase(input))) {
-                    cout << song->track_name << " (" << song->year << ") - Popularidad: " << song->popularity << endl;
-                }
-                break;
-
-            case 3:
-                cout << "Ingresa el Nombre de la Cancion: ";
-                getline(cin, input);
-                for (const auto& song : library.searchByTrackName(toLowerCase(input))) {
-                    cout << song->artist_name << " - " << song->track_name << " (" << song->year << ") - Popularidad: " << song->popularity << endl;
-                }
-                break;
-
-            case 4:
-                cout << "Saliendo del programa." << endl;
-                break;
-
-            default:
-                cout << "Opcion invalida. Por favor, intenta nuevamente." << endl;
-                break;
-        }
-    } while (choice != 4);
-}
-
-int main() {
-    SongLibrary library;
-    library.loadSongs("spotify_data.csv");
-
-    showMenu(library);
-
-    return 0;
-}
-*/
-
 #include <iostream>
 #include <fstream>
 #include <unordered_map>
@@ -219,13 +6,16 @@ int main() {
 #include <vector>
 #include <memory>
 #include <algorithm>
-#include <map> // Para el Red-Black Tree
+#include <map>
+#include <stack>
+#include <queue>
+#include <functional>
 
 using namespace std;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // PARA COMPILAR CON g++17
-//g++ -std=c++17 -o n_reproductor n_reproductor.cpp
+// g++ -std=c++17 -o n_reproductor n_reproductor.cpp
 ////////////////////////////////////////////////////////////////////////////////////////
 
 // Estructura para almacenar información de una canción
@@ -267,7 +57,6 @@ class Trie {
 public:
     Trie() : root(make_unique<TrieNode>()) {}
 
-    // Insertar una canción en el Trie usando el nombre del artista o de la canción
     void insert(const string& key, Song* song) {
         string lowerKey = toLowerCase(key);
         TrieNode* current = root.get();
@@ -280,67 +69,107 @@ public:
         current->songs.push_back(song);
     }
 
-    // Búsqueda de canciones por prefijo
     vector<Song*> searchByPrefix(const string& prefix) const {
         string lowerPrefix = toLowerCase(prefix);
         TrieNode* current = root.get();
         for (char ch : lowerPrefix) {
             if (!current->children.count(ch)) {
-                return {}; // No hay coincidencias
+                return {};
             }
             current = current->children[ch].get();
         }
-        return current->songs; // Retorna todas las canciones que coincidan con el prefijo
+        return current->songs;
     }
 
 private:
     unique_ptr<TrieNode> root;
 };
 
-// Clase Playlist utilizando un Red-Black Tree (std::map)
+// Clase Playlist
 class Playlist {
 public:
-    // Añadir una canción a la playlist
     void addSong(int key, Song* song) {
         if (songs.count(key)) {
-            cout << "La cancion con la clave " << key << " ya esta en la playlist." << endl;
+            cout << "La canción con la clave " << key << " ya está en la playlist." << endl;
             return;
         }
         songs[key] = song;
-        cout << "Cancion insertada en la playlist: " << song->track_name << endl;
+        insertionOrder.push_back(song);
+        cout << "Canción insertada en la playlist: " << song->track_name << endl;
     }
 
-    // Eliminar una canción de la playlist
     void removeSong(int key) {
         if (!songs.count(key)) {
-            cout << "La cancion con la clave " << key << " no esta en la playlist." << endl;
+            cout << "La canción con la clave " << key << " no está en la playlist." << endl;
             return;
         }
-        cout << "Cancion eliminada de la playlist: " << songs[key]->track_name << endl;
+        Song* song = songs[key];
         songs.erase(key);
+        insertionOrder.erase(remove(insertionOrder.begin(), insertionOrder.end(), song), insertionOrder.end());
+        cout << "Canción eliminada de la playlist: " << song->track_name << endl;
     }
 
-    // Imprimir todas las canciones de la playlist en orden
-    void printPlaylist() const {
+    void showByPopularity() const {
         if (songs.empty()) {
-            cout << "La playlist esta vacia." << endl;
+            cout << "La playlist está vacía." << endl;
             return;
         }
-        cout << "\n--- Playlist ---" << endl;
-        for (const auto& [key, song] : songs) {
-            cout << key << ": " << song->track_name << " - " << song->artist_name
-                 << " (" << song->year << ") - Popularidad: " << song->popularity << endl;
+        vector<Song*> sortedSongs = insertionOrder;
+        sort(sortedSongs.begin(), sortedSongs.end(), [](Song* a, Song* b) {
+            return a->popularity > b->popularity;
+        });
+        printSongs(sortedSongs, "Orden por Popularidad");
+    }
+
+    void showReverseInsertion() const {
+        if (insertionOrder.empty()) {
+            cout << "La playlist está vacía." << endl;
+            return;
         }
+        vector<Song*> reversedOrder = insertionOrder;
+        reverse(reversedOrder.begin(), reversedOrder.end());
+        printSongs(reversedOrder, "Orden de Inserción Inverso");
+    }
+
+    void showByYear(int year = -1) const {
+        vector<Song*> filteredSongs;
+        for (const auto& song : insertionOrder) {
+            if (year == -1 || song->year == year) {
+                filteredSongs.push_back(song);
+            }
+        }
+        sort(filteredSongs.begin(), filteredSongs.end(), [](Song* a, Song* b) {
+            return a->year < b->year;
+        });
+        string title = year == -1 ? "Orden por Fecha (Year)" : "Canciones del Año " + to_string(year);
+        printSongs(filteredSongs, title);
+    }
+
+    void printPlaylist() const {
+        if (songs.empty()) {
+            cout << "La playlist está vacía." << endl;
+            return;
+        }
+        printSongs(insertionOrder, "Orden de Inserción");
     }
 
 private:
-    map<int, Song*> songs; // Red-Black Tree (std::map)
+    map<int, Song*> songs;
+    vector<Song*> insertionOrder;
+
+    void printSongs(const vector<Song*>& songsList, const string& title) const {
+        cout << "\n--- " << title << " ---" << endl;
+        int index = 1;
+        for (const Song* song : songsList) {
+            cout << index++ << ": " << song->track_name << " - " << song->artist_name
+                 << " (" << song->year << ") - Popularidad: " << song->popularity << endl;
+        }
+    }
 };
 
-// Clase para gestionar la biblioteca de canciones
+// Clase SongLibrary
 class SongLibrary {
 public:
-    // Cargar canciones desde el archivo CSV
     void loadSongs(const string& filename) {
         ifstream file(filename);
         string line;
@@ -350,14 +179,12 @@ public:
             return;
         }
 
-        // Ignorar la primera línea (encabezados)
-        getline(file, line);
+        getline(file, line); // Ignorar encabezados
 
         while (getline(file, line)) {
             stringstream ss(line);
             string index_str, artist_name, track_name, track_id, popularity_str, year_str, genre;
 
-            // Leer cada campo de acuerdo al orden en el archivo
             getline(ss, index_str, ',');
             getline(ss, artist_name, ',');
             getline(ss, track_name, ',');
@@ -366,16 +193,13 @@ public:
             getline(ss, year_str, ',');
             getline(ss, genre, ',');
 
-            // Convertir campos numéricos
             int index = safe_stoi(index_str);
             int popularity = safe_stoi(popularity_str);
             int year = safe_stoi(year_str);
 
-            // Crear y almacenar la canción
             Song song = {index, artist_name, track_name, popularity, year, genre};
             songs.emplace(track_id, song);
 
-            // Insertar en los tries usando nombres en minúsculas
             artistTrie.insert(toLowerCase(artist_name), &songs[track_id]);
             trackTrie.insert(toLowerCase(track_name), &songs[track_id]);
         }
@@ -383,7 +207,6 @@ public:
         file.close();
     }
 
-    // Búsqueda por track_id usando el unordered_map
     Song* searchByTrackId(const string& track_id) {
         if (songs.count(track_id)) {
             return &songs[track_id];
@@ -391,12 +214,10 @@ public:
         return nullptr;
     }
 
-    // Búsqueda por nombre del artista usando Trie
     vector<Song*> searchByArtistName(const string& artist_name) const {
         return artistTrie.searchByPrefix(artist_name);
     }
 
-    // Búsqueda por nombre de la canción usando Trie
     vector<Song*> searchByTrackName(const string& track_name) const {
         return trackTrie.searchByPrefix(track_name);
     }
@@ -407,29 +228,36 @@ private:
     Trie trackTrie;
 };
 
-// Función para mostrar el menú y realizar las búsquedas y gestiones de playlist
+// Menú principal
 void showMenu(SongLibrary& library, Playlist& playlist) {
     int choice;
     string input;
 
     do {
-        cout << "\n--- Menu ---\n";
+        cout << "\n--------------- Menu ---------------\n";
         cout << "1. Buscar por Track ID\n";
         cout << "2. Buscar por Nombre del Artista\n";
-        cout << "3. Buscar por Nombre de la Cancion\n";
+        cout << "3. Buscar por Nombre de la Canción\n";
         cout << "4. Insertar Cancion a la Playlist\n";
         cout << "5. Eliminar Cancion de la Playlist\n";
         cout << "6. Mostrar Playlist\n";
-        cout << "7. Salir\n";
+        cout << "7. Mostrar Playlist por Popularidad\n";
+        cout << "8. Mostrar Playlist en Orden Inverso\n";
+        cout << "9. Mostrar Playlist por Fecha\n";
+        cout << "10. Salir\n";
         cout << "Elige una opcion: ";
         cin >> choice;
-        cin.ignore(); // Limpiar el buffer de entrada
+        cout << endl;
+        cout << "---------------------------------------------\n";
+        
+        cin.ignore();
 
         switch (choice) {
             case 1: {
                 cout << "Ingresa el Track ID: ";
                 getline(cin, input);
-                if (Song* song = library.searchByTrackId(input)) {
+                Song* song = library.searchByTrackId(input);
+                if (song) {
                     cout << "Cancion encontrada: " << song->track_name << " - " << song->artist_name << endl;
                 } else {
                     cout << "Track ID no encontrado." << endl;
@@ -439,7 +267,8 @@ void showMenu(SongLibrary& library, Playlist& playlist) {
             case 2: {
                 cout << "Ingresa el Nombre del Artista: ";
                 getline(cin, input);
-                for (const auto& song : library.searchByArtistName(toLowerCase(input))) {
+                auto songs = library.searchByArtistName(input);
+                for (const auto& song : songs) {
                     cout << song->track_name << " (" << song->year << ") - Popularidad: " << song->popularity << endl;
                 }
                 break;
@@ -447,25 +276,44 @@ void showMenu(SongLibrary& library, Playlist& playlist) {
             case 3: {
                 cout << "Ingresa el Nombre de la Cancion: ";
                 getline(cin, input);
-                for (const auto& song : library.searchByTrackName(toLowerCase(input))) {
+                auto songs = library.searchByTrackName(input);
+                for (const auto& song : songs) {
                     cout << song->artist_name << " - " << song->track_name << endl;
                 }
                 break;
             }
             case 4: {
-                cout << "Ingresa el Track ID de la Cancion a Insertar: ";
+                cout << "Ingresa el Nombre de la Cancion: ";
                 getline(cin, input);
-                if (Song* song = library.searchByTrackId(input)) {
-                    playlist.addSong(song->index, song);
+                auto songs = library.searchByTrackName(input);
+                if (songs.empty()) {
+                    cout << "No se encontraron canciones con ese nombre." << endl;
+                    break;
+                }
+                if (songs.size() == 1) {
+                    playlist.addSong(songs[0]->index, songs[0]);
                 } else {
-                    cout << "Track ID no encontrado." << endl;
+                    cout << "Hay varias canciones con ese nombre. Selecciona una:" << endl;
+                    for (size_t i = 0; i < songs.size(); ++i) {
+                        cout << i + 1 << ": " << songs[i]->track_name << " - " << songs[i]->artist_name
+                             << " (" << songs[i]->year << ") - Popularidad: " << songs[i]->popularity << endl;
+                    }
+                    size_t selection;
+                    cin >> selection;
+                    cin.ignore();
+                    if (selection > 0 && selection <= songs.size()) {
+                        playlist.addSong(songs[selection - 1]->index, songs[selection - 1]);
+                    } else {
+                        cout << "Seleccion no valida." << endl;
+                    }
                 }
                 break;
             }
             case 5: {
-                int id;
                 cout << "Ingresa el indice de la cancion a eliminar: ";
+                int id;
                 cin >> id;
+                cin.ignore();
                 playlist.removeSong(id);
                 break;
             }
@@ -473,12 +321,26 @@ void showMenu(SongLibrary& library, Playlist& playlist) {
                 playlist.printPlaylist();
                 break;
             case 7:
+                playlist.showByPopularity();
+                break;
+            case 8:
+                playlist.showReverseInsertion();
+                break;
+            case 9: {
+                cout << "Ingresa la Fecha (year o -1 para todas): ";
+                int year;
+                cin >> year;
+                cin.ignore();
+                playlist.showByYear(year);
+                break;
+            }
+            case 10:
                 cout << "Saliendo del programa." << endl;
                 break;
             default:
-                cout << "Opcion no valida. Intenta de nuevo." << endl;
+                cout << "Opcion no valida." << endl;
         }
-    } while (choice != 7);
+    } while (choice != 10);
 }
 
 // Función principal
@@ -486,9 +348,8 @@ int main() {
     SongLibrary library;
     Playlist playlist;
 
-    string filename = "spotify_data.csv";
-    library.loadSongs(filename);
-
+    library.loadSongs("spotify_data.csv");
     showMenu(library, playlist);
+
     return 0;
 }
