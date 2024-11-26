@@ -361,15 +361,86 @@ void managePlaylist(SongLibrary& library) {
         }
     } while (choice != 6);
 }
+int mainMenu(SongLibrary& library) {
+    int choice;
+
+    do {
+        cout << "\n--- Menú Principal ---\n";
+        cout << "1. Buscar canción por track_id\n";
+        cout << "2. Buscar canción por nombre de canción\n";
+        cout << "3. Buscar canción por nombre de artista\n";
+        cout << "4. Crear una nueva playlist\n";
+        cout << "5. Salir\n";
+        cout << "Ingresa tu elección: ";
+        cin >> choice;
+        cin.ignore(); // Limpiar el buffer de entrada
+
+        string input;
+        switch (choice) {
+            case 1: { // Buscar por track_id
+                cout << "Ingresa el track_id: ";
+                getline(cin, input);
+                Song* song = library.searchByTrackId(input);
+                if (song) {
+                    cout << "Canción encontrada: " << song->track_name << " - " << song->artist_name 
+                         << " (" << song->year << ")" << endl;
+                } else {
+                    cout << "No se encontró ninguna canción con ese track_id." << endl;
+                }
+                break;
+            }
+            case 2: { // Buscar por nombre de canción
+                cout << "Ingresa el nombre de la canción: ";
+                getline(cin, input);
+                vector<Song*> songs = library.searchByTrackName(input);
+                if (!songs.empty()) {
+                    cout << "Canciones encontradas:\n";
+                    for (const auto& song : songs) {
+                        cout << song->track_name << " - " << song->artist_name << " (" << song->year << ")" << endl;
+                    }
+                } else {
+                    cout << "No se encontraron canciones con ese nombre." << endl;
+                }
+                break;
+            }
+            case 3: { // Buscar por nombre de artista
+                cout << "Ingresa el nombre del artista: ";
+                getline(cin, input);
+                vector<Song*> songs = library.searchByArtistName(input);
+                if (!songs.empty()) {
+                    cout << "Canciones encontradas:\n";
+                    for (const auto& song : songs) {
+                        cout << song->track_name << " - " << song->artist_name << " (" << song->year << ")" << endl;
+                    }
+                } else {
+                    cout << "No se encontraron canciones de ese artista." << endl;
+                }
+                break;
+            }
+            case 4: // Crear nueva playlist
+                managePlaylist(library);
+                break;
+            case 5: // Salir
+                cout << "Saliendo del programa." << endl;
+                break;
+            default:
+                cout << "Opción no válida. Inténtalo nuevamente." << endl;
+        }
+    } while (choice != 5);
+
+    return 0;
+}
 
 int main() {
     SongLibrary library;
     library.loadSongs("/home/k4k4wate/Downloads/spotify_data.csv");
 
-    managePlaylist(library);
+    mainMenu(library);
 
     return 0;
 }
+
+
 
 
 
