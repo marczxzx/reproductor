@@ -6,7 +6,7 @@
 #include <vector>
 #include <memory>
 #include <algorithm>
-#include <set>
+#include <list>
 
 using namespace std;
 
@@ -18,11 +18,6 @@ struct Song {
     int popularity;
     int year;
     string genre;
-
-    // Sobrecarga de operadores para el set (árbol Red-Black)
-    bool operator<(const Song& other) const {
-        return track_name < other.track_name;  // Comparar por nombre de la canción
-    }
 };
 
 // Función para convertir un string a minúsculas
@@ -49,7 +44,7 @@ struct TrieNode {
     vector<Song*> songs; // Lista de punteros a canciones que coinciden con este prefijo
 };
 
-// Estructura Trie para realizar búsquedas por prefijo en `artist_name` y `track_name`
+// Estructura Trie para realizar búsquedas por prefijo en artist_name y track_name
 class Trie {
 public:
     Trie() : root(make_unique<TrieNode>()) {}
@@ -154,213 +149,227 @@ private:
     Trie trackTrie;
 };
 
-// Clase para gestionar playlists usando un árbol Red-Black
+// Clase Playlist
 class Playlist {
-public:
-    Playlist(const string& name) : playlist_name(name) {}
-
-    // Agregar una canción a la playlist
-    void addSong(const Song& song) {
-        playlist.insert(song);  // Usamos el árbol Red-Black (set)
-        cout << "Cancion agregada a la playlist: " << song.track_name << endl;
-    }
-
-    // Eliminar una canción de la playlist, pidiendo tanto el nombre de la canción como el nombre del autor
-    void removeSong(const string& track_name, const string& artist_name) {
-        for (auto it = playlist.begin(); it != playlist.end(); ++it) {
-            if (toLowerCase(it->track_name) == toLowerCase(track_name) && 
-                toLowerCase(it->artist_name) == toLowerCase(artist_name)) {
-                cout << "Eliminando: " << it->track_name << " de " << it->artist_name << endl;
-                playlist.erase(it);
-                return;
-            }
-        }
-        cout << "Cancion no encontrada en la playlist con el artista especificado." << endl;
-    }
-
-    // Buscar una canción en la playlist
-    void searchSong(const string& track_name) const {
-        for (const auto& song : playlist) {
-            if (toLowerCase(song.track_name) == toLowerCase(track_name)) {
-                cout << "Cancion encontrada en la playlist: " << song.track_name << endl;
-                return;
-            }
-        }
-        cout << "Cancion no encontrada en la playlist." << endl;
-    }
-
-    // Mostrar todas las canciones en la playlist
-    void showPlaylist() const {
-        cout << "\n--- Playlist: " << playlist_name << " ---" << endl;
-        for (const auto& song : playlist) {
-            cout << song.artist_name << " - " << song.track_name << " (" << song.year << ")" << endl;
-        }
-    }
-
 private:
-    string playlist_name;
-    set<Song> playlist;  // Usamos set, que internamente es un árbol Red-Black
+    string playlistName;
+    list<Song*> songs;
+    unordered_multimap<string, Song*> songMap; // Permitir duplicados usando unordered_multimap
+
+    // Convertir a minúsculas para comparaciones
+    string toLowerCase(const string& str) const {
+        string result = str;
+        for (char& c : result) {
+            c = tolower(c);
+        }
+        return result;
+    }
+
+public:
+    Playlist(const string& name) : playlistName(name) {}
+
+    // Mostrar el nombre de la playlist
+    string getName() const {
+        return playlistName;
+    }
+
+    // Agregar canción
+    void addSong(Song* song) {
+        songs.push_back(song);
+        songMap.emplace(toLowerCase(song->track_name), song);
+    }
+
+    // Eliminar canción
+    void removeSong(const string& track_name) {
+        string lowerName = toLowerCase(track_name);
+        auto range = songMap.equal_range(lowerName);
+
+        if (distance(range.first, range.second) > 1) {
+            cout << "Hay varias canciones llamadas \"" << track_name << "\". Ingresa el nombre del artista: ";
+            string artist;
+            getline(cin, artist);
+            bool songFound = false;
+            for (auto it = range.first; it != range.second; ++it) {
+                if (toLowerCase(it->second->artist_name) == toLowerCase(artist)) {
+                    songs.remove(it->second); // Eliminar de la lista
+                    songMap.erase(it);         // Eliminar de la estructura de datos
+                    cout << "Canción eliminada: " << it->second->track_name << " - " << it->second->artist_name << endl;
+                    songFound = true;
+                    break;
+                }
+            }
+            if (!songFound) {
+                cout << "No se encontró la canción con el artista especificado." << endl;
+            }
+        } else if (range.first != songMap.end()) {
+            songs.remove(range.first->second);
+            songMap.erase(range.first);
+            cout << "Canción eliminada: " << range.first->second->track_name << endl;
+        } else {
+            cout << "Canción no encontrada." << endl;
+        }
+    }
+
+    // Buscar canción
+    Song* searchSong(const string& track_name) {
+        string lowerName = toLowerCase(track_name);
+        auto range = songMap.equal_range(lowerName);
+
+        if (distance(range.first, range.second) > 1) {
+            cout << "Hay varias canciones con el nombre \"" << track_name << "\". Ingresa el nombre del artista: ";
+            string artist;
+            getline(cin, artist);
+            for (auto it = range.first; it != range.second; ++it) {
+                if (toLowerCase(it->second->artist_name) == toLowerCase(artist)) {
+                    return it->second;
+                }
+            }
+            cout << "No se encontró la canción con el nombre y artista especificados." << endl;
+            return nullptr;
+        } else if (range.first != songMap.end()) {
+            return range.first->second;
+        }
+        cout << "Canción no encontrada." << endl;
+        return nullptr;
+    }
+
+    // Mostrar todas las canciones
+    void showPlaylist() const {
+        cout << "Playlist: " << playlistName << endl;
+        if (songs.empty()) {
+            cout << "La playlist está vacía." << endl;
+            return;
+        }
+        int i = 1;
+        for (const auto& song : songs) {
+            cout << i++ << ". " << song->track_name << " - " << song->artist_name << " (" << song->year << ")" << endl;
+        }
+    }
+
+    // Cambiar la canción de posición
+    void cambiar_orden(int posicion_actual, int nueva_posicion) {
+        if (posicion_actual < 1 || nueva_posicion < 1) {
+            cout << "Las posiciones deben ser mayores que cero." << endl;
+            return;
+        }
+
+        // Convertir las posiciones a índices de la lista
+        auto it_actual = songs.begin();
+        advance(it_actual, posicion_actual - 1);
+
+        if (it_actual == songs.end()) {
+            cout << "Posición actual fuera de rango." << endl;
+            return;
+        }
+
+        auto it_nueva = songs.begin();
+        advance(it_nueva, nueva_posicion - 1);
+
+        if (it_nueva == songs.end()) {
+            cout << "Nueva posición fuera de rango." << endl;
+            return;
+        }
+
+        // Mover la canción a la nueva posición
+        Song* song = *it_actual;
+        songs.erase(it_actual);
+        songs.insert(it_nueva, song);
+
+        cout << "Canción movida a la nueva posición: " << song->track_name << " - " << song->artist_name << endl;
+    }
 };
 
-// Función para agregar una canción a la playlist filtrando por artista si hay múltiples coincidencias
-void addSongToPlaylist(Playlist& playlist, SongLibrary& library, const string& track_name) {
-    vector<Song*> matches = library.searchByTrackName(track_name);
+// Modificar la función para gestionar la playlist
+void managePlaylist(SongLibrary& library) {
+    string playlistName;
+    cout << "Ingresa el nombre de la nueva playlist: ";
+    getline(cin, playlistName);
+    Playlist playlist(playlistName);
 
-    if (matches.empty()) {
-        cout << "No se encontraron canciones con ese nombre." << endl;
-        return;
-    }
-
-    if (matches.size() == 1) {
-        playlist.addSong(*matches.front());
-    } else {
-        cout << "Se encontraron " << matches.size() << " canciones con ese nombre. Ingresa el nombre del artista para filtrar:" << endl;
-        string artist_name;
-        getline(cin, artist_name);
-
-        // Convertir la entrada a minúsculas para no importar mayúsculas o minúsculas
-        artist_name = toLowerCase(artist_name);
-
-        // Buscar coincidencias con el nombre del artista ingresado
-        for (const auto& song : matches) {
-            if (toLowerCase(song->artist_name) == artist_name) {
-                playlist.addSong(*song);
-                return;
-            }
-        }
-        cout << "No se encontraron canciones con ese nombre de artista." << endl;
-    }
-}
-
-// Función para mostrar el menú de la playlist
-void playlistMenu(Playlist& playlist, SongLibrary& library) {
     int choice;
     string input;
 
     do {
-        cout << "\n--- Menu de Playlist ---\n";
-        cout << "1. Agregar Cancion a la Playlist\n";
-        cout << "2. Eliminar Cancion de la Playlist\n";
-        cout << "3. Buscar Cancion en la Playlist\n";
-        cout << "4. Mostrar Canciones en la Playlist\n";
-        cout << "5. Salir\n";
-        cout << "Elige una opcion: ";
+        cout << "\n--- Menu de Playlist: " << playlist.getName() << " ---\n";
+        cout << "1. Agregar Canción\n";
+        cout << "2. Eliminar Canción\n";
+        cout << "3. Mostrar Playlist\n";
+        cout << "4. Buscar Canción\n";
+        cout << "5. Cambiar Orden de Canciones\n";
+        cout << "6. Salir\n";
+        cout << "Ingresa tu elección: ";
         cin >> choice;
         cin.ignore();  // Limpiar el buffer de entrada
 
         switch (choice) {
             case 1: {
-                cout << "Ingresa el nombre de la cancion: ";
+                cout << "Ingresa el nombre de la canción: ";
                 getline(cin, input);
-                addSongToPlaylist(playlist, library, toLowerCase(input));
+                vector<Song*> songs = library.searchByTrackName(input);
+                if (!songs.empty()) {
+                    cout << "Canciones encontradas: " << endl;
+                    for (size_t i = 0; i < songs.size(); ++i) {
+                        cout << i + 1 << ". " << songs[i]->track_name << " - " << songs[i]->artist_name << endl;
+                    }
+                    cout << "Ingresa el número de la canción que quieres agregar a la playlist: ";
+                    int songIndex;
+                    cin >> songIndex;
+                    cin.ignore();  // Limpiar el buffer de entrada
+                    if (songIndex > 0 && songIndex <= songs.size()) {
+                        playlist.addSong(songs[songIndex - 1]);
+                        cout << "Canción agregada a la playlist: " << songs[songIndex - 1]->track_name << endl;
+                    } else {
+                        cout << "Opción no válida." << endl;
+                    }
+                } else {
+                    cout << "Canción no encontrada." << endl;
+                }
                 break;
             }
-
             case 2: {
-                cout << "Ingresa el nombre de la cancion a eliminar: ";
-                string track_name;
-                getline(cin, track_name);
-
-                cout << "Ingresa el nombre del artista: ";
-                string artist_name;
-                getline(cin, artist_name);
-
-                playlist.removeSong(toLowerCase(track_name), toLowerCase(artist_name));
-                break;
-            }
-
-            case 3: {
-                cout << "Ingresa el nombre de la cancion a buscar: ";
+                cout << "Ingresa el nombre de la canción a eliminar: ";
                 getline(cin, input);
-                playlist.searchSong(toLowerCase(input));
+                playlist.removeSong(input);
                 break;
             }
-
-            case 4: {
+            case 3:
                 playlist.showPlaylist();
                 break;
+            case 4: {
+                cout << "Ingresa el nombre de la canción a buscar: ";
+                getline(cin, input);
+                Song* song = playlist.searchSong(input);
+                if (song != nullptr) {
+                    cout << "Canción encontrada: " << song->track_name << " - " << song->artist_name << endl;
+                }
+                break;
             }
-
-            case 5:
-                cout << "Saliendo del menu de playlist..." << endl;
+            case 5: {
+                int posicion_actual, nueva_posicion;
+                cout << "Ingresa la posición actual de la canción: ";
+                cin >> posicion_actual;
+                cout << "Ingresa la nueva posición para la canción: ";
+                cin >> nueva_posicion;
+                playlist.cambiar_orden(posicion_actual, nueva_posicion);
                 break;
-
+            }
+            case 6:
+                cout << "Saliendo del menú de la playlist." << endl;
+                break;
             default:
-                cout << "Opcion invalida. Intenta nuevamente." << endl;
-                break;
+                cout << "Opción no válida." << endl;
         }
-    } while (choice != 5);
-}
-
-
-// Función para mostrar el menú principal
-void showMenu(SongLibrary& library) {
-    int choice;
-    string input;
-
-    do {
-        cout << "\n--- Menu Principal ---\n";
-        cout << "1. Buscar por Track ID\n";
-        cout << "2. Buscar por Nombre del Artista\n";
-        cout << "3. Buscar por Nombre de la Cancion\n";
-        cout << "4. Crear una Playlist\n";
-        cout << "5. Salir\n";
-        cout << "Elige una opcion: ";
-        cin >> choice;
-        cin.ignore();  // Limpiar el buffer de entrada
-
-        switch (choice) {
-            case 1:
-                cout << "Ingresa el Track ID: ";
-                getline(cin, input);
-                if (Song* song = library.searchByTrackId(input)) {
-                    cout << song->artist_name << " - " << song->track_name << endl;
-                } else {
-                    cout << "Cancion no encontrada." << endl;
-                }
-                break;
-
-            case 2:
-                cout << "Ingresa el nombre del artista: ";
-                getline(cin, input);
-                for (const auto& song : library.searchByArtistName(input)) {
-                    cout << song->artist_name << " - " << song->track_name << endl;
-                }
-                break;
-
-            case 3:
-                cout << "Ingresa el nombre de la cancion: ";
-                getline(cin, input);
-                for (const auto& song : library.searchByTrackName(input)) {
-                    cout << song->artist_name << " - " << song->track_name << endl;
-                }
-                break;
-
-            case 4:
-                cout << "Ingresa el nombre de la playlist: ";
-                getline(cin, input);
-                {
-                    Playlist playlist(input);
-                    playlistMenu(playlist, library);  // Ir al menú de playlist
-                }
-                break;
-
-            case 5:
-                cout << "Saliendo..." << endl;
-                break;
-
-            default:
-                cout << "Opcion invalida. Por favor, intenta nuevamente." << endl;
-                break;
-        }
-    } while (choice != 5);
+    } while (choice != 6);
 }
 
 int main() {
     SongLibrary library;
-    library.loadSongs("/home/k4k4wate/Downloads/spotify_data.csv");  // Cambia la ruta si es necesario
-    showMenu(library);
+    library.loadSongs("/home/k4k4wate/Downloads/spotify_data.csv");
+
+    managePlaylist(library);
+
     return 0;
 }
+
 
 
