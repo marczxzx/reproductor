@@ -91,9 +91,53 @@ vector<Song*> SongLibrary::searchByArtistName(const string& artist_name) {
     }
     return result;
 }
+///////////////////////////
+// Ordenar por popularidad
 
+void SongLibrary::ordenarPorPopularidad() {
+    std::sort(songs.begin(), songs.end(), [](const Song& a, const Song& b) {
+        return a.popularity > b.popularity;
+    });
 
+    for (const Song& song : songs) {
+        cout << song.track_name << " - " << song.artist_name << " (" << song.popularity << ")" << endl;
+    }
+}
+void SongLibrary::ordenarPorAnio() {
+    std::sort(songs.begin(), songs.end(), [](const Song& a, const Song& b) {
+        return a.year > b.year;
+    });
 
+    for (const Song& song : songs) {
+        cout << song.track_name << " - " << song.artist_name << " (" << song.year << ")" << endl;
+    }
+}
 
+void SongLibrary::filtrarPorGenero(const string& genero) {
+    for (const Song& song : songs) {
+        if (toLowerCase(song.genre) == toLowerCase(genero)) {
+            cout << song.track_name << " - " << song.artist_name << " (" << song.genre << ")" << endl;
+        }
+    }
+}
+
+//////////////////////
+// Implementación de getSongsSortedByPopularity
+vector<Song> SongLibrary::getSongsSortedByPopularity() {
+    std::vector<Song> sortedSongs = songs; // Copia de objetos
+    std::sort(sortedSongs.begin(), sortedSongs.end(), [](const Song& a, const Song& b) {
+        return a.popularity > b.popularity;
+    });
+    return sortedSongs;
+}
+
+// Implementación de getSongsSortedByYear
+vector<Song> SongLibrary::getSongsSortedByYear() {
+    std::vector<Song> sortedSongs = songs; // Copia de objetos
+    std::sort(sortedSongs.begin(), sortedSongs.end(), [](const Song& a, const Song& b) {
+        return a.year > b.year;
+    });
+    return sortedSongs;
+}
 
 

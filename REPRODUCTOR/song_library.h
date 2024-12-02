@@ -11,6 +11,7 @@ private:
     vector<Song> songs;  // Vector que almacena las canciones
 
 public:
+   
     // Cargar canciones desde un archivo CSV
     void loadSongs(const string& filename);
 
@@ -22,8 +23,19 @@ public:
 
     // Buscar canción por nombre de artista
     vector<Song*> searchByArtistName(const string& artist_name);
+    
+    void ordenarPorPopularidad();
 
+    void ordenarPorAnio();
+    
+    void filtrarPorGenero(const string& genero);
+
+    vector<Song> getSongsSortedByPopularity();
+
+    vector<Song> getSongsSortedByYear();
 };
 
 #endif // SONG_LIBRARY_H
+
+
 
