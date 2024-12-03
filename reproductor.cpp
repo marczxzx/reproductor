@@ -34,6 +34,32 @@ int safe_stoi(const string& str) {
         return 0; // Valor predeterminado si la conversión falla
     }
 }
+// Función para agregar una nueva canción
+Song createSong() {
+    Song newSong;
+    cout << "Ingresa el índice de la canción: ";
+    cin >> newSong.index;
+    cin.ignore();  // Ignorar el salto de línea
+
+    cout << "Ingresa el nombre del artista: ";
+    getline(cin, newSong.artist_name);
+
+    cout << "Ingresa el nombre de la canción: ";
+    getline(cin, newSong.track_name);
+
+    cout << "Ingresa la popularidad (0-100): ";
+    cin >> newSong.popularity;
+    cin.ignore();  // Ignorar el salto de línea
+
+    cout << "Ingresa el año de la canción: ";
+    cin >> newSong.year;
+    cin.ignore();  // Ignorar el salto de línea
+
+    cout << "Ingresa el género: ";
+    getline(cin, newSong.genre);
+
+    return newSong;
+}
 
 // Nodo del Árbol AVL
 struct AVLNode {
@@ -205,10 +231,138 @@ private:
         return result;
     }
 };
+/////////////////////////////////////////////////////////////////////////////
+// Nodo del Árbol AVL basado en el año
+struct AVLNodeYear {
+    Song song;
+    AVLNodeYear* left;
+    AVLNodeYear* right;
+    int height;
+
+    AVLNodeYear(Song song) : song(song), left(nullptr), right(nullptr), height(1) {}
+};
+
+// Clase para manejar el Árbol AVL basado en el año
+class AVLTreeYear {
+public:
+    AVLTreeYear() : root(nullptr) {}
+
+    // Insertar canción en el árbol AVL ordenado por año
+    void insert(Song song) {
+        root = insert(root, song);
+    }
+
+    // Mostrar todas las canciones en orden por año de lo más reciente a lo más antiguo
+    void displayByYear(int& count, int limit) {
+        displayByYear(root, count, limit);
+    }
+
+private:
+    AVLNodeYear* root;
+
+    int height(AVLNodeYear* node) {
+        if (node == nullptr) return 0;
+        return node->height;
+    }
+
+    int getBalance(AVLNodeYear* node) {
+        if (node == nullptr) return 0;
+        return height(node->left) - height(node->right);
+    }
+
+    AVLNodeYear* rightRotate(AVLNodeYear* y) {
+        AVLNodeYear* x = y->left;
+        AVLNodeYear* T2 = x->right;
+
+        x->right = y;
+        y->left = T2;
+
+        y->height = max(height(y->left), height(y->right)) + 1;
+        x->height = max(height(x->left), height(x->right)) + 1;
+
+        return x;
+    }
+
+    AVLNodeYear* leftRotate(AVLNodeYear* x) {
+        AVLNodeYear* y = x->right;
+        AVLNodeYear* T2 = y->left;
+
+        y->left = x;
+        x->right = T2;
+
+        x->height = max(height(x->left), height(x->right)) + 1;
+        y->height = max(height(y->left), height(y->right)) + 1;
+
+        return y;
+    }
+
+    AVLNodeYear* insert(AVLNodeYear* node, Song song) {
+
+        if (song.year > 2024) return node;
+
+        if (node == nullptr) return new AVLNodeYear(song);
+
+        if (song.year > node->song.year) {
+            node->left = insert(node->left, song);
+        } else {
+            node->right = insert(node->right, song);
+        }
+
+        node->height = 1 + max(height(node->left), height(node->right));
+
+        int balance = getBalance(node);
+
+        if (balance > 1 && song.year > node->left->song.year) {
+            return rightRotate(node);
+        }
+        if (balance < -1 && song.year <= node->right->song.year) {
+            return leftRotate(node);
+        }
+        if (balance > 1 && song.year <= node->left->song.year) {
+            node->left = leftRotate(node->left);
+            return rightRotate(node);
+        }
+        if (balance < -1 && song.year > node->right->song.year) {
+            node->right = rightRotate(node->right);
+            return leftRotate(node);
+        }
+
+        return node;
+    }
+
+    void displayByYear(AVLNodeYear* node, int& count, int limit) {
+        if (node == nullptr || count >= limit) return;
+
+        displayByYear(node->left, count, limit);
+    
+        // Mostrar solo las canciones de 2024 o anteriores
+        if (node->song.year <= 2024 && count < limit) {
+            cout << node->song.artist_name << " - " << node->song.track_name << " (Año: " << node->song.year << ")" << endl;
+            count++;
+        }
+
+        displayByYear(node->right, count, limit);
+    }
+
+};
+/////////////////////////////////////////////////////////
 
 // Clase para gestionar la biblioteca de canciones
 class SongLibrary {
 public:
+    // Función para agregar una nueva canción a la biblioteca
+    void addSong(const Song& newSong) {
+        songs.push_back(newSong);
+
+    // Insertar en el Trie de artistas y canciones
+        artistTrie.insert(toLowerCase(newSong.artist_name), newSong);
+        trackTrie.insert(toLowerCase(newSong.track_name), newSong);
+
+    // Insertar en el árbol AVL basado en popularidad
+        avlTree.insert(newSong);
+        avlTreeYear.insert(newSong);  // Insertar en el AVL basado en año
+    }
+
     void loadSongs(const string& filename) {
         ifstream file(filename);
         string line;
@@ -236,6 +390,8 @@ public:
             int popularity = safe_stoi(popularity_str);
             int year = safe_stoi(year_str);
 
+            if (year > 2024) continue;
+
             Song song = {index, artist_name, track_name, popularity, year, genre};
             songs.push_back(song);
 
@@ -244,6 +400,7 @@ public:
 
             // Insertar canción en el AVLTree basado en la popularidad
             avlTree.insert(song);
+            avlTreeYear.insert(song);    // Basado en año
         }
 
         file.close();
@@ -271,12 +428,17 @@ public:
         int count = 0;
         avlTree.displayInOrder(count, limit);  // Mostrar las canciones ordenadas
     }
+    void displayTopSongsByYear(int limit) {
+        int count = 0;
+        avlTreeYear.displayByYear(count, limit);
+    }
 
 private:
     vector<Song> songs;
     Trie artistTrie;
     Trie trackTrie;
     AVLTree avlTree; // Árbol AVL para canciones ordenadas por popularidad
+    AVLTreeYear avlTreeYear; // Árbol AVL para canciones ordenadas por año
 };
 
 // Función para mostrar el menú interactivo
@@ -288,7 +450,9 @@ void showMenu(SongLibrary& library) {
         cout << "1. Buscar por canción" << endl;
         cout << "2. Buscar por artista" << endl;
         cout << "3. Mostrar canciones ordenadas por popularidad" << endl;
-        cout << "4. Salir" << endl;
+        cout << "4. Mostrar canciones ordenadas por año" << endl;
+        cout << "5. Agregar una nueva canción" << endl;
+        cout << "6. Salir" << endl;
         cout << "Seleccione una opción: ";
         cin >> option;
         cin.ignore();
@@ -343,9 +507,19 @@ void showMenu(SongLibrary& library) {
             }
         } else if (option == 3) {
             library.sortByPopularity();
+        } else if (option == 4) {
+            int limit;
+            cout << "¿Cuántas canciones deseas mostrar? ";
+            cin >> limit;
+            cout << "Canciones ordenadas por año (de lo más reciente a lo más antiguo):" << endl;
+            library.displayTopSongsByYear(limit);
+        } else if (option == 5) {
+            Song newSong = createSong();
+            library.addSong(newSong);
+            cout << "Cancion agregada exitosamente!" << endl;
         }
 
-    } while (option != 4);
+    } while (option != 6);
 }
 
 int main() {
@@ -356,5 +530,8 @@ int main() {
 
     return 0;
 }
+
+
+
 
 
